@@ -1,0 +1,58 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    configFileProvider([configFile(fileId: '0551f64c-d93b-4cd5-bc91-1d40ff993fc0', targetLocation: '.env')]) {
+                        sh """
+                            docker build -t todo-list-app .
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Push to DockerHub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'jenkins-dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                        sh """
+                            docker login -u '${DOCKERHUB_USER}' -p '${DOCKERHUB_PASS}'
+                            docker tag todo-list-app ${DOCKERHUB_USER}/todo-list-app:latest
+                            docker push ${DOCKERHUB_USER}/todo-list-app:latest
+                        """
+                    }
+                }
+            }
+        }
+
+        stage('Scan Docker Image') {
+            steps {
+                script {
+                    def trivyOutput = sh(script: "trivy image todo-list-app", returnStdout: true).trim()
+                    println trivyOutput
+
+                    if (trivyOutput.contains("Total: 0")) {
+                        echo "No vulnerabilities found in the Docker image."
+                    } else {
+                        echo "Vulnerabilities found in the Docker image."
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Development') {
+            steps {
+                script {
+                    sh """
+                        docker rm -f todo-list-dev
+                        docker run -d -p 8001:8000 --name todo-list-dev todo-list-app:latest
+                    """
+                }
+            }
+        }
+
+    }
+}
