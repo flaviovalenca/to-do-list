@@ -23,7 +23,7 @@ pipeline {
         stage('Push to DockerHub') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
                         sh '''
                             printf '%s' "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
                             docker tag todo-list-app "$DOCKERHUB_USER/todo-list-app:latest"
@@ -37,7 +37,7 @@ pipeline {
         stage('Deploy to Development') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'jenkins-dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
                         sh '''
                             printf '%s' "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
                             docker rm -f todo-list-dev || true
