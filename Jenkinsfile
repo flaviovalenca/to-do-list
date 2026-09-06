@@ -6,7 +6,15 @@ pipeline {
             steps {
                 script {
                     configFileProvider([configFile(fileId: '9e8e2fc0-a32d-4d0f-b4d0-4cbbf39a1b7d', targetLocation: '.env')]) {
-                        sh 'docker build -t todo-list-app .'
+                        sh '''
+                            docker build --progress=plain -t todo-list-app . &
+                            build_pid=$!
+                            while kill -0 "$build_pid" 2>/dev/null; do
+                                echo "Docker build ainda em execução..."
+                                sleep 30
+                            done
+                            wait "$build_pid"
+                        '''
                     }
                 }
             }
