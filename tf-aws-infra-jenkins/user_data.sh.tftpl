@@ -1,0 +1,71 @@
+#!/bin/bash
+set -euo pipefail
+
+exec > >(tee /var/log/to-do-list-bootstrap.log | logger -t to-do-list-bootstrap -s 2>/dev/console) 2>&1
+
+hostnamectl set-hostname jenkins
+apt-get update -y
+apt-get install -y ca-certificates curl gnupg openssh-client
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+printf '%s\n' "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
+apt-get update -y
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable --now docker
+usermod -aG docker ubuntu
+
+sysctl -w vm.max_map_count=262144
+printf '%s\n' 'vm.max_map_count=262144' > /etc/sysctl.d/99-sonarqube.conf
+
+mkdir -p /opt/to-do-list/jenkins-image /opt/to-do-list/secrets /opt/to-do-list/jenkins_home /opt/to-do-list/sonarqube_data
+chmod 700 /opt/to-do-list/secrets
+
+echo '${dockerhub_username_base64}' | base64 -d > /opt/to-do-list/secrets/dockerhub_username
+echo '${dockerhub_token_base64}' | base64 -d > /opt/to-do-list/secrets/dockerhub_token
+echo '${github_ssh_private_key_base64}' | base64 -d > /opt/to-do-list/secrets/github_ssh_private_key
+echo '${jenkins_admin_password_base64}' | base64 -d > /opt/to-do-list/secrets/jenkins_admin_password
+echo '${github_repository_base64}' | base64 -d > /opt/to-do-list/secrets/github_repository
+chmod 600 /opt/to-do-list/secrets/*
+
+ssh-keyscan -H github.com > /opt/to-do-list/secrets/known_hosts
+chmod 600 /opt/to-do-list/secrets/known_hosts
+
+echo '${jenkins_dockerfile_base64}' | base64 -d > /opt/to-do-list/jenkins-image/Dockerfile
+echo '${jenkins_bootstrap_base64}' | base64 -d > /opt/to-do-list/jenkins-image/bootstrap.groovy
+
+cat > /opt/to-do-list/docker-compose.yml <<'COMPOSE'
+services:
+  jenkins:
+    build:
+      context: /opt/to-do-list/jenkins-image
+    container_name: jenkins
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - /opt/to-do-list/jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /opt/to-do-list/secrets:/run/jenkins-secrets:ro
+      - /opt/to-do-list/secrets/known_hosts:/var/jenkins_home/.ssh/known_hosts:ro
+    environment:
+      JAVA_OPTS: "-Djenkins.install.runSetupWizard=false"
+
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+    volumes:
+      - /opt/to-do-list/sonarqube_data:/opt/sonarqube/data
+      - /opt/to-do-list/sonarqube_extensions:/opt/sonarqube/extensions
+      - /opt/to-do-list/sonarqube_logs:/opt/sonarqube/logs
+    environment:
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLE: "true"
+COMPOSE
+
+chown -R 1000:1000 /opt/to-do-list/jenkins_home
+cd /opt/to-do-list
+docker compose up -d --build

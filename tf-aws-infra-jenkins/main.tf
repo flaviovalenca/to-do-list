@@ -1,3 +1,17 @@
+terraform {
+  required_version = ">= 1.0.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "5.99.1"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = "~> 3.0"
+    }
+  }
+}
+
 #================================================================================================
 # SECURITY GROUP INSTANCE
 #================================================================================================
@@ -65,7 +79,15 @@ resource "aws_instance" "web" {
   vpc_security_group_ids      = [aws_security_group.security_group_instance_test.id]
   associate_public_ip_address = true
   subnet_id                   = var.subnet_id
-  user_data                   = file("user_data.sh")
+  user_data = templatefile("${path.module}/user_data.sh.tftpl", {
+    dockerhub_username_base64     = base64encode(var.dockerhub_username)
+    dockerhub_token_base64        = base64encode(var.dockerhub_token)
+    github_ssh_private_key_base64 = var.github_ssh_private_key_base64
+    jenkins_admin_password_base64 = base64encode(var.jenkins_admin_password)
+    github_repository_base64      = base64encode(var.github_repository)
+    jenkins_dockerfile_base64     = base64encode(file("${path.module}/jenkins/Dockerfile"))
+    jenkins_bootstrap_base64      = base64encode(file("${path.module}/jenkins/bootstrap.groovy"))
+  })
 
   metadata_options {
     http_tokens                 = "required"

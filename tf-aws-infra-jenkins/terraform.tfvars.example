@@ -1,0 +1,7 @@
+# Copy the required secret values to environment variables before running recreate.sh.
+# This file is documentation only and must not contain real secrets.
+
+# dockerhub_username = "your-dockerhub-user"
+# dockerhub_token = "your-dockerhub-access-token"
+# jenkins_admin_password = "choose-a-strong-password"
+# github_repository = "git@github.com:flaviovalenca/to-do-list.git"
