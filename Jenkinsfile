@@ -40,20 +40,15 @@ pipeline {
         stage('Deploy to Production') {
             steps {
                 script {
-                    def userInput = input(message: "Deploy to Production? (yes/no)", ok: 'Deploy',
+                    input(message: 'Deploy to Production?', ok: 'Deploy',
                         submitterParameter: 'submitter')
-                    if (userInput == 'yes') {
-                        withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                            sh '''
-                                echo "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
-                                docker pull "$DOCKERHUB_USER/todo-list-app:latest"
-                                docker rm -f todo-list-app-prod || true
-                                docker run -d --name todo-list-app-prod -p 8000:8000 "$DOCKERHUB_USER/todo-list-app:latest"
-                            '''
-                        }
-                    } else {
-                        currentBuild.result = 'ABORTED'
-                        error('Deploy to production cancelled')
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                        sh '''
+                            echo "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
+                            docker pull "$DOCKERHUB_USER/todo-list-app:latest"
+                            docker rm -f todo-list-app-prod || true
+                            docker run -d --name todo-list-app-prod -p 8000:8000 "$DOCKERHUB_USER/todo-list-app:latest"
+                        '''
                     }
                 }
             }
