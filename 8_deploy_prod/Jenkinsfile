@@ -4,11 +4,7 @@ pipeline {
     stages {
         stage('Build Docker Image') {
             steps {
-                script {
-                    configFileProvider([configFile(fileId: '9e8e2fc0-a32d-4d0f-b4d0-4cbbf39a1b7d', targetLocation: '.env')]) {
-                        sh 'docker build -t todo-list-app .'
-                    }
-                }
+                sh 'docker build -t todo-list-app .'
             }
         }
 
@@ -38,16 +34,12 @@ pipeline {
         }
 
         stage('Deploy to Production') {
-            when {
-                environment name: 'DEPLOY_ENV', value: 'production'
-            }
             steps {
-                input message: "Deploy to Production? (yes/no)"
                 script {
                     def userInput = input(message: "Deploy to Production? (yes/no)", ok: 'Deploy',
                         submitterParameter: 'submitter')
                     if (userInput == 'yes') {
-                        withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                        withCredentials([usernamePassword(credentialsId: 'jenkins-dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
                             sh """
                                 docker login -u '${DOCKERHUB_USER}' -p '${DOCKERHUB_PASS}'
                                 docker pull ${DOCKERHUB_USER}/todo-list-app:latest 
