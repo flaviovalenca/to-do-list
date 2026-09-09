@@ -12,11 +12,11 @@ pipeline {
             steps {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                        sh """
-                            docker login -u '${DOCKERHUB_USER}' -p '${DOCKERHUB_PASS}'
-                            docker tag todo-list-app ${DOCKERHUB_USER}/todo-list-app:latest
-                            docker push ${DOCKERHUB_USER}/todo-list-app:latest
-                        """
+                        sh '''
+                            echo "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
+                            docker tag todo-list-app "$DOCKERHUB_USER/todo-list-app:latest"
+                            docker push "$DOCKERHUB_USER/todo-list-app:latest"
+                        '''
                     }
                 }
             }
@@ -25,10 +25,14 @@ pipeline {
         stage('Deploy to Development') {
             steps {
                 script {
-                    sh """
-                        docker rm -f todo-list-dev
-                        docker run -d -p 8001:8000 --name todo-list-dev pcmadevops/todo-list-app:latest
-                    """
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                        sh '''
+                            echo "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
+                            docker rm -f todo-list-dev || true
+                            docker pull "$DOCKERHUB_USER/todo-list-app:latest"
+                            docker run -d -p 8001:8000 --name todo-list-dev "$DOCKERHUB_USER/todo-list-app:latest"
+                        '''
+                    }
                 }
             }
         }
@@ -40,12 +44,12 @@ pipeline {
                         submitterParameter: 'submitter')
                     if (userInput == 'yes') {
                         withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
-                            sh """
-                                docker login -u '${DOCKERHUB_USER}' -p '${DOCKERHUB_PASS}'
-                                docker pull ${DOCKERHUB_USER}/todo-list-app:latest 
-                                docker rm -f todo-list-app-prod
-                                docker run -d --name todo-list-app-prod -p 8000:8000 ${DOCKERHUB_USER}/todo-list-app:latest
-                            """
+                            sh '''
+                                echo "$DOCKERHUB_PASS" | docker login --username "$DOCKERHUB_USER" --password-stdin
+                                docker pull "$DOCKERHUB_USER/todo-list-app:latest"
+                                docker rm -f todo-list-app-prod || true
+                                docker run -d --name todo-list-app-prod -p 8000:8000 "$DOCKERHUB_USER/todo-list-app:latest"
+                            '''
                         }
                     } else {
                         currentBuild.result = 'ABORTED'
